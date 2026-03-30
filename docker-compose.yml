@@ -1,0 +1,12 @@
+version: "3.8"
+services:
+  relay:
+    build:
+      context: ./relay-server
+      dockerfile: Dockerfile
+    ports:
+      - "8765:8765"
+    environment:
+      - PORT=8765
+      - MAX_SESSIONS=100
+    restart: unless-stopped
