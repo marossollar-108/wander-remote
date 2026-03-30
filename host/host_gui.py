@@ -13,6 +13,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from host import RemoteHost
+from config import RELAY_URL
 
 # Farby
 RED = "#EB002F"
@@ -93,7 +94,7 @@ class WanderRemoteGUI:
         url_frame = tk.Frame(content, bg=BORDER, bd=1, relief=tk.SOLID)
         url_frame.pack(fill=tk.X, pady=(2, 10))
 
-        self.url_var = tk.StringVar(value="ws://localhost:8765")
+        self.url_var = tk.StringVar(value=RELAY_URL)
         self.url_entry = tk.Entry(
             url_frame,
             textvariable=self.url_var,

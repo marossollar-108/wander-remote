@@ -1,4 +1,4 @@
-export const RELAY_URL = 'ws://localhost:8765';
+export const RELAY_URL = import.meta.env.VITE_RELAY_URL || 'ws://localhost:8765';
 
 export const QUALITY_PRESETS = {
   low: { quality: 20, max_fps: 10, label: 'Nizka' },
