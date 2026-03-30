@@ -1,0 +1,52 @@
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --color-primary: #EB002F;
+  --color-primary-hover: #C50028;
+  --color-primary-light: #FBCCD6;
+  --color-primary-ring: #F799AD;
+  --color-black: #1A1A1A;
+  --color-black-80: #484848;
+  --color-black-60: #777777;
+  --color-black-40: #A5A5A5;
+  --color-black-20: #D2D2D2;
+  --color-surface: #F5F5F5;
+  --color-border: #D2D2D2;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Montserrat', system-ui, sans-serif;
+  background-color: var(--color-surface);
+  color: var(--color-black);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+/* Hide scrollbar on remote desktop view */
+.remote-view {
+  overflow: hidden;
+}
+
+/* Pulse animation for connection status */
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+.animate-pulse-dot {
+  animation: pulse-dot 1.5s ease-in-out infinite;
+}
