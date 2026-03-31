@@ -94,12 +94,6 @@ class RemoteHost:
                     "height": self.screen_height,
                 }))
 
-                # Spusti input worker thread
-                self._input_thread = threading.Thread(
-                    target=self._input_worker, daemon=True
-                )
-                self._input_thread.start()
-
                 # Spusti receive + capture loop
                 await asyncio.gather(
                     self._receive_loop(),
@@ -124,14 +118,13 @@ class RemoteHost:
         except websockets.ConnectionClosed:
             pass
 
-    def _input_worker(self):
-        """Samostatne vlakno na vykonavanie input prikazov."""
-        logger.info("Input worker started")
-        while self.running:
+    def _process_inputs(self):
+        """Spracuj vsetky input prikazy z queue (volane z main threadu)."""
+        while not self._input_queue.empty():
             try:
-                cmd = self._input_queue.get(timeout=0.1)
+                cmd = self._input_queue.get_nowait()
             except queue.Empty:
-                continue
+                break
             try:
                 action = cmd[0]
                 if action == "move":
@@ -146,7 +139,6 @@ class RemoteHost:
                     self.input_handler.key_combo(cmd[1])
             except Exception as e:
                 logger.error("Input error: %s", e)
-        logger.info("Input worker stopped")
 
     async def _handle_message(self, raw: str):
         """Spracuj prichadzajuce spravy."""
@@ -277,14 +269,29 @@ class RemoteHost:
             await asyncio.sleep(10)
 
 
-async def main():
+def main():
     host = RemoteHost(RELAY_URL)
 
-    loop = asyncio.get_event_loop()
-    loop.add_signal_handler(signal.SIGINT, lambda: setattr(host, 'running', False))
+    def run_async():
+        asyncio.run(host.start())
 
-    await host.start()
+    # Asyncio bezi v background threade
+    async_thread = threading.Thread(target=run_async, daemon=True)
+    async_thread.start()
+
+    logger.info("Host running — main thread processing inputs (Ctrl+C to stop)")
+
+    # Main thread spracovava input queue (macOS vyzaduje main thread pre Quartz)
+    try:
+        while async_thread.is_alive():
+            host._process_inputs()
+            time.sleep(0.001)  # 1ms polling
+    except KeyboardInterrupt:
+        host.running = False
+        logger.info("Stopping...")
+
+    async_thread.join(timeout=3)
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()
