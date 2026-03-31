@@ -5,8 +5,10 @@ import base64
 import concurrent.futures
 import json
 import logging
+import queue
 import signal
 import sys
+import threading
 import time
 
 sys.path.insert(0, str(__import__('pathlib').Path(__file__).resolve().parent.parent))
@@ -42,6 +44,9 @@ class RemoteHost:
         self.password = None
         self.viewer_connected = False
         self.running = False
+
+        self._input_queue = queue.Queue()
+        self._input_thread = None
 
         self.capture = ScreenCapture(
             quality=CAPTURE_QUALITY,
@@ -89,6 +94,12 @@ class RemoteHost:
                     "height": self.screen_height,
                 }))
 
+                # Spusti input worker thread
+                self._input_thread = threading.Thread(
+                    target=self._input_worker, daemon=True
+                )
+                self._input_thread.start()
+
                 # Spusti receive + capture loop
                 await asyncio.gather(
                     self._receive_loop(),
@@ -113,6 +124,30 @@ class RemoteHost:
         except websockets.ConnectionClosed:
             pass
 
+    def _input_worker(self):
+        """Samostatne vlakno na vykonavanie input prikazov."""
+        logger.info("Input worker started")
+        while self.running:
+            try:
+                cmd = self._input_queue.get(timeout=0.1)
+            except queue.Empty:
+                continue
+            try:
+                action = cmd[0]
+                if action == "move":
+                    self.input_handler.move_mouse(cmd[1], cmd[2])
+                elif action == "click":
+                    self.input_handler.click(cmd[1], cmd[2], cmd[3], cmd[4])
+                elif action == "scroll":
+                    self.input_handler.scroll(cmd[1], cmd[2], cmd[3])
+                elif action == "key":
+                    self.input_handler.key_press(cmd[1], cmd[2])
+                elif action == "combo":
+                    self.input_handler.key_combo(cmd[1])
+            except Exception as e:
+                logger.error("Input error: %s", e)
+        logger.info("Input worker stopped")
+
     async def _handle_message(self, raw: str):
         """Spracuj prichadzajuce spravy."""
         try:
@@ -122,49 +157,31 @@ class RemoteHost:
             return
 
         msg_type = msg.get("type")
-        logger.info("[DEBUG] Received: %s", msg_type)
 
         if msg_type == MessageType.VIEWER_JOINED.value:
             self.viewer_connected = True
             logger.info("Viewer connected!")
-            print("  Viewer connected!")
 
         elif msg_type == MessageType.PEER_DISCONNECTED.value:
             self.viewer_connected = False
             logger.info("Viewer disconnected")
-            print("  Viewer disconnected. Waiting for new viewer...")
 
         elif msg_type == MessageType.MOUSE_MOVE.value:
-            try:
-                x = msg.get("x", 0)
-                y = msg.get("y", 0)
-                logger.info("[DEBUG] mouse_move x=%s y=%s type_x=%s type_y=%s", x, y, type(x).__name__, type(y).__name__)
-                self.input_handler.move_mouse(x, y)
-            except Exception as e:
-                logger.error("Mouse move error: %s", e, exc_info=True)
+            self._input_queue.put(("move", msg.get("x", 0), msg.get("y", 0)))
 
         elif msg_type == MessageType.MOUSE_CLICK.value:
-            try:
-                self.input_handler.click(
-                    msg.get("x", 0), msg.get("y", 0),
-                    msg.get("button", "left"), msg.get("action", "click"),
-                )
-            except Exception as e:
-                logger.error("Mouse click error: %s", e)
+            self._input_queue.put(("click", msg.get("x", 0), msg.get("y", 0),
+                msg.get("button", "left"), msg.get("action", "click")))
 
         elif msg_type == MessageType.MOUSE_SCROLL.value:
-            self.input_handler.scroll(
-                msg.get("x", 0), msg.get("y", 0),
-                msg.get("delta", 0),
-            )
+            self._input_queue.put(("scroll", msg.get("x", 0), msg.get("y", 0),
+                msg.get("delta", 0)))
 
         elif msg_type == MessageType.KEY_EVENT.value:
-            self.input_handler.key_press(
-                msg.get("key", ""), msg.get("action", "press"),
-            )
+            self._input_queue.put(("key", msg.get("key", ""), msg.get("action", "press")))
 
         elif msg_type == MessageType.KEY_COMBO.value:
-            self.input_handler.key_combo(msg.get("keys", []))
+            self._input_queue.put(("combo", msg.get("keys", [])))
 
         elif msg_type == MessageType.QUALITY_CHANGE.value:
             quality = msg.get("quality")
