@@ -6,7 +6,9 @@ import { MOUSE_THROTTLE_MS } from '../config';
  */
 export function useRemoteCanvas({ hostScreen, lastFrame, lastDelta, send }) {
   const canvasRef = useRef(null);
+  const cursorCanvasRef = useRef(null);
   const lastMouseSendRef = useRef(0);
+  const cursorPosRef = useRef({ x: 0, y: 0 });
 
   // ---------- Frame rendering ----------
 
@@ -84,6 +86,37 @@ export function useRemoteCanvas({ hostScreen, lastFrame, lastDelta, send }) {
 
   // ---------- Mouse handlers ----------
 
+  const drawCursor = useCallback((x, y) => {
+    const cursorCanvas = cursorCanvasRef.current;
+    const mainCanvas = canvasRef.current;
+    if (!cursorCanvas || !mainCanvas) return;
+
+    cursorCanvas.width = mainCanvas.width;
+    cursorCanvas.height = mainCanvas.height;
+    const ctx = cursorCanvas.getContext('2d');
+    ctx.clearRect(0, 0, cursorCanvas.width, cursorCanvas.height);
+
+    const px = x * cursorCanvas.width;
+    const py = y * cursorCanvas.height;
+
+    // Cerveny kruzok
+    ctx.beginPath();
+    ctx.arc(px, py, 8, 0, Math.PI * 2);
+    ctx.strokeStyle = '#EB002F';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // Krizik
+    ctx.beginPath();
+    ctx.moveTo(px - 12, py);
+    ctx.lineTo(px + 12, py);
+    ctx.moveTo(px, py - 12);
+    ctx.lineTo(px, py + 12);
+    ctx.strokeStyle = '#EB002F';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+  }, []);
+
   const handleMouseMove = useCallback(
     (e) => {
       const now = Date.now();
@@ -92,9 +125,11 @@ export function useRemoteCanvas({ hostScreen, lastFrame, lastDelta, send }) {
 
       const pos = canvasToRelative(e);
       if (!pos) return;
+      cursorPosRef.current = pos;
+      drawCursor(pos.x, pos.y);
       send({ type: 'mouse_move', x: pos.x, y: pos.y });
     },
-    [canvasToRelative, send]
+    [canvasToRelative, send, drawCursor]
   );
 
   const buttonName = (btn) => {
@@ -260,6 +295,7 @@ export function useRemoteCanvas({ hostScreen, lastFrame, lastDelta, send }) {
 
   return {
     canvasRef,
+    cursorCanvasRef,
     mouseHandlers: {
       onMouseMove: handleMouseMove,
       onMouseDown: handleMouseDown,

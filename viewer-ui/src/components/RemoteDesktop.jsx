@@ -10,7 +10,7 @@ export default function RemoteDesktop({
   send,
   onDisconnect,
 }) {
-  const { canvasRef, mouseHandlers } = useRemoteCanvas({
+  const { canvasRef, cursorCanvasRef, mouseHandlers } = useRemoteCanvas({
     hostScreen,
     lastFrame,
     lastDelta,
@@ -32,14 +32,24 @@ export default function RemoteDesktop({
       />
 
       {/* Canvas area */}
-      <div className="flex-1 flex items-center justify-center bg-[#111] overflow-hidden">
-        <canvas
-          ref={canvasRef}
-          style={{ aspectRatio: aspect, maxWidth: '100%', maxHeight: '100%' }}
-          className="block cursor-crosshair"
-          tabIndex={0}
-          {...mouseHandlers}
-        />
+      <div className="flex-1 flex items-center justify-center bg-[#111] overflow-hidden relative">
+        <div className="relative" style={{ aspectRatio: aspect, maxWidth: '100%', maxHeight: '100%' }}>
+          <canvas
+            ref={canvasRef}
+            style={{ width: '100%', height: '100%' }}
+            className="block"
+          />
+          <canvas
+            ref={cursorCanvasRef}
+            style={{ width: '100%', height: '100%', position: 'absolute', top: 0, left: 0, pointerEvents: 'none' }}
+            className="block"
+          />
+          <div
+            style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', cursor: 'none' }}
+            tabIndex={0}
+            {...mouseHandlers}
+          />
+        </div>
       </div>
     </div>
   );
