@@ -1,19 +1,20 @@
 const { app, BrowserWindow, desktopCapturer, screen } = require('electron');
-const { WebSocketServer } = require('ws');
-const http = require('http');
-const fs = require('fs');
-const path = require('path');
+const WebSocket = require('ws');
 const robot = require('robotjs');
+const path = require('path');
 
 // Config
-const PORT = 7417;
+const RELAY_URL = process.env.RELAY_URL || 'ws://142.93.169.75:8765';
 const CAPTURE_FPS = 15;
 const JPEG_QUALITY = 40;
 
 let mainWindow;
-let httpServer;
-let wss;
-let captureInterval;
+let ws;
+let sessionId = null;
+let password = null;
+let viewerConnected = false;
+let captureInterval = null;
+let reconnectTimeout = null;
 
 function getScreenSize() {
   const display = screen.getPrimaryDisplay();
@@ -29,139 +30,216 @@ async function captureScreen() {
   return sources[0].thumbnail.toJPEG(JPEG_QUALITY);
 }
 
-function handleInput(data) {
-  try {
-    const events = JSON.parse(data);
-    for (const event of events) {
-      const type = event[0];
-      if (type === 0) {
-        robot.moveMouse(event[1], event[2]);
-      } else if (type === 1) {
-        const btn = ['left', 'middle', 'right'][event[3]] || 'left';
-        robot.moveMouse(event[1], event[2]);
-        robot.mouseToggle('down', btn);
-      } else if (type === 2) {
-        const btn = ['left', 'middle', 'right'][event[3]] || 'left';
-        robot.moveMouse(event[1], event[2]);
-        robot.mouseToggle('up', btn);
-      } else if (type === 3) {
-        robot.moveMouse(event[1], event[2]);
-        robot.scrollMouse(0, event[3]);
-      } else if (type === 4) {
-        robot.keyToggle(event[1], 'down');
-      } else if (type === 5) {
-        robot.keyToggle(event[1], 'up');
-      }
-    }
-  } catch (e) {
-    console.error('Input error:', e.message);
+// --- Input handling (robotjs) ---
+
+const KEY_MAP = {
+  'ctrl': 'control', 'meta': 'command', 'win': 'command',
+  'esc': 'escape', 'del': 'delete',
+};
+
+function mapKey(key) {
+  return KEY_MAP[key] || key;
+}
+
+function handleMouseMove(msg) {
+  const { width, height } = getScreenSize();
+  const x = Math.round(msg.x * width);
+  const y = Math.round(msg.y * height);
+  robot.moveMouse(x, y);
+}
+
+function handleMouseClick(msg) {
+  const { width, height } = getScreenSize();
+  const x = Math.round(msg.x * width);
+  const y = Math.round(msg.y * height);
+  const btn = msg.button || 'left';
+  const action = msg.action || 'click';
+
+  robot.moveMouse(x, y);
+
+  if (action === 'click') {
+    robot.mouseClick(btn);
+  } else if (action === 'double' || action === 'dblclick') {
+    robot.mouseClick(btn, true);
+  } else if (action === 'down') {
+    robot.mouseToggle('down', btn);
+  } else if (action === 'up') {
+    robot.mouseToggle('up', btn);
   }
 }
 
-function startServer() {
-  // HTTP server — servuje viewer stranku
-  httpServer = http.createServer((req, res) => {
-    if (req.url === '/' || req.url === '/index.html') {
-      const viewerPath = path.join(__dirname, '..', 'httprd', 'index.html');
-      if (fs.existsSync(viewerPath)) {
-        res.writeHead(200, { 'Content-Type': 'text/html' });
-        res.end(fs.readFileSync(viewerPath));
-      } else {
-        res.writeHead(200, { 'Content-Type': 'text/html' });
-        res.end('<h1>Wander Remote Host</h1><p>Viewer HTML not found</p>');
-      }
-    } else {
-      res.writeHead(404);
-      res.end('Not found');
-    }
-  });
-
-  // WebSocket server na rovnakom porte
-  wss = new WebSocketServer({ noServer: true });
-
-  httpServer.on('upgrade', (req, socket, head) => {
-    wss.handleUpgrade(req, socket, head, (ws) => {
-      wss.emit('connection', ws, req);
-    });
-  });
-
-  wss.on('connection', (ws, req) => {
-    const urlPath = req.url || '';
-    console.log(`WS connection: ${urlPath}`);
-
-    // View WebSocket — posiela framy
-    if (urlPath.includes('connect_view_ws')) {
-      updateStatus('Viewer pripojeny!');
-      handleViewConnection(ws);
-    }
-    // Input WebSocket — prijima myš/klavesnicu
-    else if (urlPath.includes('connect_input_ws')) {
-      handleInputConnection(ws);
-    }
-    // Fallback — httprd style (combined)
-    else {
-      updateStatus('Viewer pripojeny!');
-      handleCombinedConnection(ws);
-    }
-  });
-
-  httpServer.listen(PORT, () => {
-    console.log(`Server on http://0.0.0.0:${PORT}`);
-    updateStatus('Cakam na pripojenie...');
-  });
+function handleMouseScroll(msg) {
+  const { width, height } = getScreenSize();
+  const x = Math.round(msg.x * width);
+  const y = Math.round(msg.y * height);
+  robot.moveMouse(x, y);
+  robot.scrollMouse(0, -(msg.delta || 0));
 }
 
-function handleViewConnection(ws) {
-  const screenSize = getScreenSize();
-  let lastFrame = null;
+function handleKeyEvent(msg) {
+  const key = mapKey(msg.key);
+  const action = msg.action || 'press';
 
-  ws.on('message', async (raw) => {
-    const data = Buffer.isBuffer(raw) ? raw : Buffer.from(raw);
-    if (data.length === 0) return;
-    const packetType = data[0];
+  try {
+    if (action === 'press') {
+      robot.keyTap(key);
+    } else if (action === 'down') {
+      robot.keyToggle(key, 'down');
+    } else if (action === 'up') {
+      robot.keyToggle(key, 'up');
+    }
+  } catch (e) {
+    console.error(`Key error: ${key}`, e.message);
+  }
+}
 
-    // Frame request (0x01)
-    if (packetType === 0x01) {
-      try {
-        const frame = await captureScreen();
-        if (frame && ws.readyState === 1) {
-          const header = Buffer.alloc(6);
-          header[0] = 0x02;
-          header.writeUInt16LE(screenSize.width, 1);
-          header.writeUInt16LE(screenSize.height, 3);
-          header[5] = 0x01; // full frame
-          ws.send(Buffer.concat([header, frame]));
-        }
-      } catch (e) {
-        console.error('Capture error:', e.message);
-      }
+function handleKeyCombo(msg) {
+  const keys = (msg.keys || []).map(mapKey);
+  if (keys.length === 0) return;
+  try {
+    // Last key is the main key, rest are modifiers
+    const modifiers = keys.slice(0, -1);
+    const key = keys[keys.length - 1];
+    robot.keyTap(key, modifiers);
+  } catch (e) {
+    console.error(`Combo error: ${msg.keys}`, e.message);
+  }
+}
+
+// --- Relay connection ---
+
+function connect() {
+  updateStatus('Pripajam sa na relay...');
+  console.log(`Connecting to ${RELAY_URL}`);
+
+  ws = new WebSocket(RELAY_URL);
+
+  ws.on('open', () => {
+    console.log('Connected to relay');
+    ws.send(JSON.stringify({ type: 'host_register' }));
+  });
+
+  ws.on('message', (raw, isBinary) => {
+    if (isBinary) return;
+
+    let msg;
+    try {
+      msg = JSON.parse(raw.toString());
+    } catch {
+      return;
+    }
+
+    const type = msg.type;
+
+    if (type === 'session_created') {
+      sessionId = msg.session_id;
+      password = msg.password;
+      console.log(`Session: ${sessionId} | Password: ${password}`);
+      updateSession(sessionId, password);
+      updateStatus('Cakam na viewer...');
+
+      // Send screen info
+      const { width, height } = getScreenSize();
+      ws.send(JSON.stringify({
+        type: 'host_screen_info',
+        width,
+        height,
+      }));
+    }
+
+    else if (type === 'viewer_joined') {
+      viewerConnected = true;
+      console.log('Viewer connected!');
+      updateStatus('Viewer pripojeny!');
+      startCapture();
+    }
+
+    else if (type === 'peer_disconnected') {
+      viewerConnected = false;
+      console.log('Viewer disconnected');
+      updateStatus('Cakam na viewer...');
+      stopCapture();
+    }
+
+    else if (type === 'mouse_move') {
+      handleMouseMove(msg);
+    }
+    else if (type === 'mouse_click') {
+      handleMouseClick(msg);
+    }
+    else if (type === 'mouse_scroll') {
+      handleMouseScroll(msg);
+    }
+    else if (type === 'key_event') {
+      handleKeyEvent(msg);
+    }
+    else if (type === 'key_combo') {
+      handleKeyCombo(msg);
+    }
+    else if (type === 'quality_change') {
+      // TODO: adjust capture settings
+      console.log('Quality change:', msg);
+    }
+    else if (type === 'ping') {
+      ws.send(JSON.stringify({ type: 'pong', timestamp: msg.timestamp }));
     }
   });
 
   ws.on('close', () => {
-    console.log('View disconnected');
-    updateStatus('Viewer odpojeny');
+    console.log('Disconnected from relay');
+    viewerConnected = false;
+    stopCapture();
+    updateStatus('Odpojeny — reconnect o 3s...');
+    reconnectTimeout = setTimeout(connect, 3000);
+  });
+
+  ws.on('error', (err) => {
+    console.error('WS error:', err.message);
   });
 }
 
-function handleInputConnection(ws) {
-  ws.on('message', (raw) => {
-    const data = Buffer.isBuffer(raw) ? raw : Buffer.from(raw);
-    if (data.length > 1 && data[0] === 0x03) {
-      const payload = data.slice(1).toString('ascii');
-      handleInput(payload);
+// --- Screen capture loop ---
+
+function startCapture() {
+  if (captureInterval) return;
+
+  const { width, height } = getScreenSize();
+  let busy = false;
+
+  captureInterval = setInterval(async () => {
+    if (busy || !viewerConnected || !ws || ws.readyState !== 1) return;
+    busy = true;
+
+    try {
+      const jpeg = await captureScreen();
+      if (jpeg && ws.readyState === 1) {
+        const base64 = jpeg.toString('base64');
+        ws.send(JSON.stringify({
+          type: 'frame_full',
+          timestamp: Date.now(),
+          width,
+          height,
+          format: 'jpeg',
+          quality: JPEG_QUALITY,
+          data: base64,
+        }));
+      }
+    } catch (e) {
+      console.error('Capture error:', e.message);
     }
-  });
 
-  ws.on('close', () => {
-    console.log('Input disconnected');
-  });
+    busy = false;
+  }, 1000 / CAPTURE_FPS);
 }
 
-function handleCombinedConnection(ws) {
-  handleViewConnection(ws);
-  handleInputConnection(ws);
+function stopCapture() {
+  if (captureInterval) {
+    clearInterval(captureInterval);
+    captureInterval = null;
+  }
 }
+
+// --- GUI ---
 
 function updateStatus(text) {
   if (mainWindow && !mainWindow.isDestroyed()) {
@@ -169,10 +247,16 @@ function updateStatus(text) {
   }
 }
 
+function updateSession(id, pwd) {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('session', { id, password: pwd });
+  }
+}
+
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 400,
-    height: 300,
+    height: 350,
     resizable: false,
     webPreferences: {
       nodeIntegration: true,
@@ -185,10 +269,11 @@ function createWindow() {
 
 app.whenReady().then(() => {
   createWindow();
-  startServer();
+  connect();
 });
 
 app.on('window-all-closed', () => {
-  if (httpServer) httpServer.close();
+  if (ws) ws.close();
+  if (reconnectTimeout) clearTimeout(reconnectTimeout);
   app.quit();
 });
