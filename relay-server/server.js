@@ -249,6 +249,7 @@ wss.on('connection', (ws, req) => {
 
     // Forward viewer -> host
     if (role === 'viewer' && VIEWER_TO_HOST.has(msg.type)) {
+      log(`[DEBUG] viewer->host: ${msg.type}`);
       if (session.host?.readyState === 1) {
         session.host.send(raw.toString());
       }

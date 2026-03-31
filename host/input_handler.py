@@ -61,11 +61,13 @@ class InputHandler:
     def move_mouse(self, x_ratio: float, y_ratio: float):
         """Presun mys. x_ratio a y_ratio su 0.0-1.0."""
         if not self._check_rate_limit():
+            logger.warning("Rate limited!")
             return
         if not validate_mouse_coords(x_ratio, y_ratio):
             logger.warning("Invalid mouse coords: %s, %s", x_ratio, y_ratio)
             return
         x, y = self._to_screen_coords(x_ratio, y_ratio)
+        logger.info("[INPUT] moveTo(%d, %d) from ratio (%.3f, %.3f)", x, y, x_ratio, y_ratio)
         pyautogui.moveTo(x, y, _pause=False)
 
     def click(self, x_ratio: float, y_ratio: float, button: str, action: str):
