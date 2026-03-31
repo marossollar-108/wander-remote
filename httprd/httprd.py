@@ -26,7 +26,7 @@ import PIL
 import PIL.Image
 import PIL.ImageGrab
 import PIL.ImageChops
-import pyautogui
+import platform
 import traceback
 
 from datetime import datetime
@@ -38,9 +38,7 @@ except ImportError:
 
 # Const config
 DOWNSAMPLE = PIL.Image.BILINEAR
-# Minimal amount of partial frames to be sent before sending full repaint frame to avoid fallback to full repaint on long delay channels
 MIN_PARTIAL_FRAMES_BEFORE_FULL_REPAINT = 60
-# Minimal amount of empty frames to be sent before sending full repaint frame to avoid fallback to full repaint on long delay channels
 MIN_EMPTY_FRAMES_BEFORE_FULL_REPAINT = 120
 
 # Input event types
@@ -51,8 +49,107 @@ INPUT_EVENT_MOUSE_SCROLL = 3
 INPUT_EVENT_KEY_DOWN     = 4
 INPUT_EVENT_KEY_UP       = 5
 
-# Failsafe disable
-pyautogui.FAILSAFE = False
+# --- Input backend ---
+IS_MACOS = platform.system() == "Darwin"
+
+if IS_MACOS:
+    import Quartz
+    from Quartz import (
+        CGEventCreateMouseEvent, CGEventCreateScrollWheelEvent,
+        CGEventCreateKeyboardEvent, CGEventPost, CGEventSetIntegerValueField,
+        kCGEventMouseMoved, kCGEventLeftMouseDown, kCGEventLeftMouseUp,
+        kCGEventRightMouseDown, kCGEventRightMouseUp,
+        kCGEventOtherMouseDown, kCGEventOtherMouseUp,
+        kCGHIDEventTap, kCGMouseButtonLeft, kCGMouseButtonRight, kCGMouseButtonCenter,
+        kCGScrollEventUnitLine,
+    )
+
+    _BUTTON_CG = [kCGMouseButtonLeft, kCGMouseButtonCenter, kCGMouseButtonRight]
+    _DOWN_EV = [kCGEventLeftMouseDown, kCGEventOtherMouseDown, kCGEventRightMouseDown]
+    _UP_EV = [kCGEventLeftMouseUp, kCGEventOtherMouseUp, kCGEventRightMouseUp]
+
+    # pyautogui key name -> macOS virtual keycode
+    _KEYCODE = {
+        "a": 0, "b": 11, "c": 8, "d": 2, "e": 14, "f": 3, "g": 5,
+        "h": 4, "i": 34, "j": 38, "k": 40, "l": 37, "m": 46, "n": 45,
+        "o": 31, "p": 35, "q": 12, "r": 15, "s": 1, "t": 17, "u": 32,
+        "v": 9, "w": 13, "x": 7, "y": 16, "z": 6,
+        "0": 29, "1": 18, "2": 19, "3": 20, "4": 21,
+        "5": 23, "6": 22, "7": 26, "8": 28, "9": 25,
+        "enter": 36, "return": 36, "tab": 48, "space": 49,
+        "backspace": 51, "delete": 117, "escape": 53,
+        "up": 126, "down": 125, "left": 123, "right": 124,
+        "home": 115, "end": 119, "pageup": 116, "pagedown": 121,
+        "f1": 122, "f2": 120, "f3": 99, "f4": 118, "f5": 96, "f6": 97,
+        "f7": 98, "f8": 100, "f9": 101, "f10": 109, "f11": 103, "f12": 111,
+        "shiftleft": 56, "shiftright": 60, "shift": 56,
+        "ctrlleft": 59, "ctrlright": 62, "ctrl": 59,
+        "altleft": 58, "altright": 61, "alt": 58,
+        "winleft": 55, "winright": 55, "cmd": 55, "meta": 55,
+        "capslock": 57, "numlock": 71, "scrolllock": 107,
+        "'": 39, ",": 43, "-": 27, ".": 47, "/": 44,
+        ";": 41, "=": 24, "[": 33, "\\": 42, "]": 30, "`": 50,
+        "+": 24,
+    }
+
+    def _input_move(x, y):
+        ev = CGEventCreateMouseEvent(None, kCGEventMouseMoved, (x, y), kCGMouseButtonLeft)
+        CGEventPost(kCGHIDEventTap, ev)
+
+    def _input_mouse_down(x, y, button):
+        btn = _BUTTON_CG[button] if button < 3 else kCGMouseButtonLeft
+        ev_type = _DOWN_EV[button] if button < 3 else kCGEventLeftMouseDown
+        ev = CGEventCreateMouseEvent(None, ev_type, (x, y), btn)
+        CGEventPost(kCGHIDEventTap, ev)
+
+    def _input_mouse_up(x, y, button):
+        btn = _BUTTON_CG[button] if button < 3 else kCGMouseButtonLeft
+        ev_type = _UP_EV[button] if button < 3 else kCGEventLeftMouseUp
+        ev = CGEventCreateMouseEvent(None, ev_type, (x, y), btn)
+        CGEventPost(kCGHIDEventTap, ev)
+
+    def _input_scroll(x, y, dy):
+        _input_move(x, y)
+        ev = CGEventCreateScrollWheelEvent(None, kCGScrollEventUnitLine, 1, int(dy))
+        CGEventPost(kCGHIDEventTap, ev)
+
+    def _input_key_down(keycode):
+        kc = _KEYCODE.get(keycode)
+        if kc is not None:
+            ev = CGEventCreateKeyboardEvent(None, kc, True)
+            CGEventPost(kCGHIDEventTap, ev)
+
+    def _input_key_up(keycode):
+        kc = _KEYCODE.get(keycode)
+        if kc is not None:
+            ev = CGEventCreateKeyboardEvent(None, kc, False)
+            CGEventPost(kCGHIDEventTap, ev)
+
+    print("[INPUT] Using Quartz/CoreGraphics backend")
+
+else:
+    import pyautogui
+    pyautogui.FAILSAFE = False
+
+    def _input_move(x, y):
+        pyautogui.moveTo(x, y)
+
+    def _input_mouse_down(x, y, button):
+        pyautogui.mouseDown(x, y, button=['left', 'middle', 'right'][button])
+
+    def _input_mouse_up(x, y, button):
+        pyautogui.mouseUp(x, y, button=['left', 'middle', 'right'][button])
+
+    def _input_scroll(x, y, dy):
+        pyautogui.scroll(dy, x, y)
+
+    def _input_key_down(keycode):
+        pyautogui.keyDown(keycode)
+
+    def _input_key_up(keycode):
+        pyautogui.keyUp(keycode)
+
+    print("[INPUT] Using pyautogui backend")
 
 # Args
 args = {}
@@ -116,7 +213,7 @@ async def get__connect_input_ws(request: aiohttp.web.Request) -> aiohttp.web.Str
     def release_keys():
         for k in state_keys.keys():
             if state_keys[k]:
-                pyautogui.keyUp(k)
+                _input_key_up(k)
 
     def update_key_state(key, state):
         state_keys[key] = state
@@ -149,46 +246,41 @@ async def get__connect_input_ws(request: aiohttp.web.Request) -> aiohttp.web.Str
 
                             # Iterate events
                             for event in data:
-                                if event[0] == INPUT_EVENT_MOUSE_MOVE: # mouse position
+                                if event[0] == INPUT_EVENT_MOUSE_MOVE:
                                     mouse_x = max(0, min(real_width, event[1]))
                                     mouse_y = max(0, min(real_height, event[2]))
+                                    _input_move(mouse_x, mouse_y)
 
-                                    pyautogui.moveTo(mouse_x, mouse_y)
-                                elif event[0] == INPUT_EVENT_MOUSE_DOWN: # mouse down
-                                    mouse_x = max(0, min(real_width, event[1]))
-                                    mouse_y = max(0, min(real_height, event[2]))
-                                    button = event[3]
-
-                                    # Allow only left, middle, right
-                                    if button < 0 or button > 2:
-                                        continue
-
-                                    pyautogui.mouseDown(mouse_x, mouse_y, button=[ 'left', 'middle', 'right' ][button])
-                                elif event[0] == INPUT_EVENT_MOUSE_UP: # mouse up
+                                elif event[0] == INPUT_EVENT_MOUSE_DOWN:
                                     mouse_x = max(0, min(real_width, event[1]))
                                     mouse_y = max(0, min(real_height, event[2]))
                                     button = event[3]
-
-                                    # Allow only left, middle, right
                                     if button < 0 or button > 2:
                                         continue
+                                    _input_mouse_down(mouse_x, mouse_y, button)
 
-                                    pyautogui.mouseUp(mouse_x, mouse_y, button=[ 'left', 'middle', 'right' ][button])
-                                elif event[0] == INPUT_EVENT_MOUSE_SCROLL: # mouse scroll
+                                elif event[0] == INPUT_EVENT_MOUSE_UP:
+                                    mouse_x = max(0, min(real_width, event[1]))
+                                    mouse_y = max(0, min(real_height, event[2]))
+                                    button = event[3]
+                                    if button < 0 or button > 2:
+                                        continue
+                                    _input_mouse_up(mouse_x, mouse_y, button)
+
+                                elif event[0] == INPUT_EVENT_MOUSE_SCROLL:
                                     mouse_x = max(0, min(real_width, event[1]))
                                     mouse_y = max(0, min(real_height, event[2]))
                                     dy = int(event[3])
+                                    _input_scroll(mouse_x, mouse_y, dy)
 
-                                    pyautogui.scroll(dy, mouse_x, mouse_y)
-                                elif event[0] == INPUT_EVENT_KEY_DOWN: # keypress
+                                elif event[0] == INPUT_EVENT_KEY_DOWN:
                                     keycode = event[1]
-
-                                    pyautogui.keyDown(keycode)
+                                    _input_key_down(keycode)
                                     update_key_state(keycode, True)
-                                elif event[0] == INPUT_EVENT_KEY_UP: # keypress
-                                    keycode = event[1]
 
-                                    pyautogui.keyUp(keycode)
+                                elif event[0] == INPUT_EVENT_KEY_UP:
+                                    keycode = event[1]
+                                    _input_key_up(keycode)
                                     update_key_state(keycode, False)
                     except:
                         traceback.print_exc()
