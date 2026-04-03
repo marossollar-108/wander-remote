@@ -38,7 +38,7 @@ export default function ConnectScreen({ status, error, onConnect }) {
               htmlFor="sessionId"
               className="block text-sm font-medium text-tk-black-80 mb-1.5"
             >
-              ID relacie
+              Host ID
             </label>
             <input
               id="sessionId"
@@ -126,8 +126,38 @@ export default function ConnectScreen({ status, error, onConnect }) {
           </button>
         </form>
 
+        {/* Download section */}
+        <div className="mt-8 pt-6 border-t border-tk-border">
+          <p className="text-sm font-medium text-tk-black-80 text-center mb-3">
+            Stiahnite si Host aplikaciu
+          </p>
+          <div className="space-y-2">
+            <a
+              href="https://github.com/marossollar-108/wander-remote/releases/latest/download/Wander.Remote.Host-1.0.0-arm64.dmg"
+              className="flex items-center justify-between w-full px-4 py-2.5 rounded-input border border-tk-border hover:bg-surface transition-colors text-sm"
+            >
+              <span className="text-tk-black">macOS (Apple Silicon)</span>
+              <span className="text-tk-black-40 text-xs">.dmg — M1/M2/M3/M4</span>
+            </a>
+            <a
+              href="https://github.com/marossollar-108/wander-remote/releases/latest/download/Wander.Remote.Host-1.0.0.dmg"
+              className="flex items-center justify-between w-full px-4 py-2.5 rounded-input border border-tk-border hover:bg-surface transition-colors text-sm"
+            >
+              <span className="text-tk-black">macOS (Intel)</span>
+              <span className="text-tk-black-40 text-xs">.dmg — Intel Mac</span>
+            </a>
+            <a
+              href="https://github.com/marossollar-108/wander-remote/releases/latest/download/Wander.Remote.Host.Setup.1.0.0.exe"
+              className="flex items-center justify-between w-full px-4 py-2.5 rounded-input border border-tk-border hover:bg-surface transition-colors text-sm"
+            >
+              <span className="text-tk-black">Windows</span>
+              <span className="text-tk-black-40 text-xs">.exe — Windows 10+</span>
+            </a>
+          </div>
+        </div>
+
         {/* Footer */}
-        <p className="mt-8 text-center text-xs text-tk-black-40">
+        <p className="mt-6 text-center text-xs text-tk-black-40">
           Powered by Tulave kino
         </p>
       </div>

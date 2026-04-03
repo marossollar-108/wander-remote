@@ -17,8 +17,13 @@
     "productName": "Wander Remote Host",
     "mac": {
       "category": "public.app-category.utilities",
-      "target": ["dmg"],
-      "hardenedRuntime": false
+      "target": ["dmg", "zip"],
+      "hardenedRuntime": true,
+      "entitlements": "entitlements.mac.plist",
+      "entitlementsInherit": "entitlements.mac.plist"
+    },
+    "dmg": {
+      "sign": false
     },
     "win": {
       "target": ["nsis"]
@@ -26,6 +31,11 @@
     "nsis": {
       "oneClick": true,
       "allowToChangeInstallationDirectory": false
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "marossollar-108",
+      "repo": "wander-remote"
     }
   },
   "devDependencies": {
@@ -33,6 +43,7 @@
     "electron-builder": "^26.8.1"
   },
   "dependencies": {
+    "electron-updater": "^6.6.2",
     "robotjs": "^0.7.0",
     "screenshot-desktop": "^1.15.3",
     "ws": "^8.20.0"

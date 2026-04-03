@@ -17,40 +17,52 @@ Host aplikaciu nainstalujete na pocitac, ktory chcete ovladat na dialku.
 
 ### Mac (Apple Silicon — M1/M2/M3/M4)
 
-1. Otvorte subor **Wander Remote Host-1.0.0-arm64.dmg**
-2. Presunte ikonu **Wander Remote Host** do priecinka **Applications**
-3. Otvorte aplikaciu z Applications
-4. Ak sa zobrazi hlaska "aplikaciu nie je mozne otvorit" — kliknite pravym tlacidlom na ikonu → **Otvorit** → **Otvorit**
+1. Stiahnite subor **Wander Remote Host-1.0.0-arm64.dmg**
+2. Otvorte stiahnuty subor
+3. Presunte ikonu **Wander Remote Host** do priecinka **Applications**
+4. Otvorte aplikaciu z Applications
 
 ### Mac (Intel)
 
-1. Otvorte subor **Wander Remote Host-1.0.0.dmg**
-2. Presunte ikonu **Wander Remote Host** do priecinka **Applications**
-3. Otvorte aplikaciu z Applications
-4. Ak sa zobrazi hlaska "aplikaciu nie je mozne otvorit" — kliknite pravym tlacidlom na ikonu → **Otvorit** → **Otvorit**
+1. Stiahnite subor **Wander Remote Host-1.0.0.dmg**
+2. Otvorte stiahnuty subor
+3. Presunte ikonu **Wander Remote Host** do priecinka **Applications**
+4. Otvorte aplikaciu z Applications
 
 ### Windows
 
-1. Spustite subor **Wander Remote Host Setup 1.0.0.exe**
+1. Stiahnite a spustite subor **Wander Remote Host Setup 1.0.0.exe**
 2. Instalator sa spusti automaticky
 3. Po instalacii sa aplikacia spusti sama
 
 ---
 
-## 2. Povolenie pristupnosti (DOLEZITE!)
+## 2. Povolenia (DOLEZITE!)
 
-Aby aplikacia mohla ovladat mys a klavesnicu, musite jej dat povolenie v nastaveniach systemu. **Bez tohto kroku nebude fungovat ovladanie.**
+Aby aplikacia mohla snimat obrazovku a ovladat mys/klavesnicu, musite jej dat povolenia. **Bez tohto kroku nebude fungovat.**
 
-### Mac
+Pri prvom spusteni vas aplikacia automaticky vyzve na udelenie povoleni.
 
-1. Otvorte **Nastavenia systemu** (System Settings)
-2. Chodte do **Sukromie a bezpecnost** (Privacy & Security)
-3. Kliknite na **Pristupnost** (Accessibility)
-4. Kliknite na zamok vlavo dole a zadajte heslo
-5. Kliknite **+** a pridajte aplikaciu **Wander Remote Host**
-6. Uistite sa ze je zaskrtnuta (zapnuta)
+### Mac — Pristupnost (Accessibility)
 
-Ak pouzivate Terminal na spustenie, pridajte aj **Terminal** do zoznamu.
+Toto povolenie umoznuje ovladanie mysi a klavesnice.
+
+1. Po spusteni sa zobrazi dialog s vyzvou
+2. Kliknite **Otvorit nastavenia**
+3. V System Settings > Sukromie a bezpecnost > Pristupnost
+4. Najdite **Wander Remote Host** a zapnite prepinac
+5. Restartujte aplikaciu
+
+### Mac — Nahravanie obrazovky (Screen Recording)
+
+Toto povolenie umoznuje snimanie obrazovky.
+
+1. Po spusteni sa zobrazi dialog s vyzvou
+2. Kliknite **Otvorit nastavenia**
+3. V System Settings > Sukromie a bezpecnost > Nahravanie obrazovky
+4. Kliknite **+** dole a pridajte **Wander Remote Host** z Applications
+5. Zapnite prepinac
+6. Restartujte aplikaciu
 
 ### Windows
 
@@ -58,20 +70,32 @@ Na Windows sa zobrazi vyskakovacie okno s otazkou ci chcete povolit pristup. Kli
 
 ---
 
-## 3. Spustenie Host aplikacie
+## 3. Pouzivanie Host aplikacie
 
 1. Otvorte **Wander Remote Host**
-2. Pocajte kym sa zobrazi **Session ID** (6-miestne cislo) a **Heslo**
-3. Tieto udaje budete potrebovat na pripojenie z viewera
+2. Zobrazi sa okno s vasim **Host ID** (6-miestne cislo) a **Heslom**
+3. Tieto udaje su trvale — nemenia sa ani po restarte alebo aktualizacii
 
 Priklad:
 
 ```
-Session ID: 439554
-Heslo:      0ecf30
+Host ID: 439554
+Heslo:   0ecf30
 ```
 
-Aplikaciu nechajte otvorenu — kym bezi, pocitac je dostupny na dialku.
+### Beh na pozadi
+
+Aplikacia bezi na pozadi v systemovej liste (tray):
+
+- **Tlacidlo "Skryt do pozadia"** — skryje okno, aplikacia bezi dalej
+- **Zatvorenie okna (X)** — tiez len skryje do pozadia
+- **Klik na ikonu v tray** — zobrazi/skryje okno
+- **Pravy klik na tray** — menu so stavom a moznostou ukoncit
+- **"Ukoncit" v tray menu** — naozaj ukonci aplikaciu
+
+### Aktualizacie
+
+Aplikacia automaticky kontroluje dostupnost novych verzii pri kazdom spusteni. Ked je dostupna aktualizacia, zobrazi sa dialog s moznostou stiahnut a nainstalovat.
 
 ---
 
@@ -81,7 +105,7 @@ Toto robite na pocitaci alebo telefone, z ktoreho chcete ovladat host.
 
 1. Otvorte prehliadac (Chrome, Safari, Firefox, Edge)
 2. Chodte na adresu: **https://remote.wanderhub.tech**
-3. Zadajte **Session ID** ktore vidite v Host aplikacii
+3. Zadajte **Host ID** ktore vidite v Host aplikacii
 4. Zadajte **Heslo** ktore vidite v Host aplikacii
 5. Kliknite **Pripojit sa**
 
@@ -97,7 +121,7 @@ Po pripojeni uvidite obrazovku host pocitaca. Teraz mozete:
 ## 5. Odpojenie
 
 - **Viewer**: Kliknite tlacidlo **Odpojit** v hornom paneli alebo zavrite prehliadac
-- **Host**: Zavrite okno aplikacie Wander Remote Host
+- **Host**: Kliknite **Ukoncit** v tray menu (zatvorenie okna len skryje do pozadia)
 
 ---
 
@@ -114,13 +138,17 @@ Skontrolujte ci mate povolenu **Pristupnost** v nastaveniach systemu (pozri krok
 ### Pripojenie zlyhalo
 
 - Skontrolujte ci je Host aplikacia spustena
-- Skontrolujte ci ste zadali spravne Session ID a Heslo
+- Skontrolujte ci ste zadali spravne Host ID a Heslo
 - Skontrolujte ci mate pripojenie na internet
 
 ### Obraz je pomaly / trha sa
 
 - Skuste znizit kvalitu v nastaveniach viewera
 - Overte ci mate stabilne internetove pripojenie na oboch stránach
+
+### Zmenilo sa mi Host ID alebo Heslo
+
+Host ID a Heslo su trvale — viazu sa na zariadenie. Nemenia sa ani po restarte, aktualizacii alebo reinstalacii. Ak sa predsa zmenili, kontaktujte podporu.
 
 ### Mozem pouzit Viewer na telefone?
 
@@ -130,8 +158,8 @@ Ano! Otvorte `https://remote.wanderhub.tech` v prehliadaci na telefone. Mozete h
 
 ## Bezpecnost
 
-- Kazda session ma unikatne Session ID a Heslo
-- Po zatvoreni Host aplikacie sa session ukoncí
+- Kazde zariadenie ma unikatne Host ID a Heslo ktore sa nemeni
+- Po ukonceni Host aplikacie sa session ukoncí a nikto sa nemoze pripojit
 - Vsetka komunikacia prebieha cez sifrovane spojenie (WSS/HTTPS)
 
 ---

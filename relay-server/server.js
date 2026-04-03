@@ -1,28 +1,78 @@
 import 'dotenv/config';
 import { WebSocketServer } from 'ws';
 import crypto from 'crypto';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const PORT = parseInt(process.env.PORT || '8765');
 const MAX_SESSIONS = parseInt(process.env.MAX_SESSIONS || '100');
 const SESSION_TIMEOUT_MS = parseInt(process.env.SESSION_TIMEOUT_MS || '300000');
 const RATE_LIMIT_PER_MIN = parseInt(process.env.RATE_LIMIT_PER_MIN || '100');
 const MAX_FAILED_ATTEMPTS_PER_MIN = 5;
+const DEVICES_FILE = path.join(__dirname, 'devices.json');
 
 // In-memory storage
 const sessions = new Map();
 const ipConnections = new Map(); // IP -> { count, resetAt }
 const ipFailedAttempts = new Map(); // IP -> { count, resetAt }
 
-function log(msg) {
-  console.log(`[${new Date().toISOString()}] ${msg}`);
+// Persistent device registry
+// { [host_id]: { host_id, name, first_seen, last_seen, ip } }
+let devices = {};
+
+function loadDevices() {
+  try {
+    const data = fs.readFileSync(DEVICES_FILE, 'utf-8');
+    devices = JSON.parse(data);
+    log(`Loaded ${Object.keys(devices).length} devices from registry`);
+  } catch {
+    devices = {};
+    log('No devices registry found, starting fresh');
+  }
 }
 
-function generateSessionId() {
-  let id;
-  do {
-    id = String(Math.floor(100000 + Math.random() * 900000));
-  } while (sessions.has(id));
-  return id;
+function saveDevices() {
+  fs.writeFileSync(DEVICES_FILE, JSON.stringify(devices, null, 2), 'utf-8');
+}
+
+function registerDevice(hostId, ip) {
+  const now = new Date().toISOString();
+  if (devices[hostId]) {
+    devices[hostId].last_seen = now;
+    devices[hostId].ip = ip;
+  } else {
+    devices[hostId] = {
+      host_id: hostId,
+      name: null,
+      password: null,
+      first_seen: now,
+      last_seen: now,
+      ip,
+    };
+  }
+  saveDevices();
+  return devices[hostId];
+}
+
+// Vrat existujuce heslo alebo vygeneruj nove a uloz
+function getOrCreatePassword(hostId) {
+  const device = devices[hostId];
+  if (device && device.password) {
+    return device.password;
+  }
+  const password = generatePassword();
+  if (device) {
+    device.password = password;
+    saveDevices();
+  }
+  return password;
+}
+
+function log(msg) {
+  console.log(`[${new Date().toISOString()}] ${msg}`);
 }
 
 function generatePassword() {
@@ -93,10 +143,13 @@ function sendJson(ws, data) {
   }
 }
 
+loadDevices();
+
 const wss = new WebSocketServer({ port: PORT });
 
 wss.on('listening', () => {
   log(`Relay server listening on ws://0.0.0.0:${PORT}`);
+  log(`Registered devices: ${Object.keys(devices).length}`);
 });
 
 wss.on('connection', (ws, req) => {
@@ -145,16 +198,40 @@ wss.on('connection', (ws, req) => {
 
     // Host registration
     if (msg.type === 'host_register') {
+      const hostId = msg.host_id;
+
+      if (!hostId || !/^\d{6}$/.test(hostId)) {
+        sendJson(ws, { type: 'error', code: 'invalid_host_id', message: 'Missing or invalid host_id (6 digits required)' });
+        ws.close(1008, 'invalid_host_id');
+        return;
+      }
+
       if (sessions.size >= MAX_SESSIONS) {
         sendJson(ws, { type: 'error', code: 'server_full', message: 'Max sessions reached' });
         ws.close(1013, 'server_full');
         return;
       }
 
-      const id = generateSessionId();
-      const password = generatePassword();
+      // Ak uz existuje aktivna session s tymto host_id, odpoj staru
+      if (sessions.has(hostId)) {
+        const oldSession = sessions.get(hostId);
+        if (oldSession.host?.readyState === 1) {
+          oldSession.host.close(1000, 'replaced');
+        }
+        if (oldSession.viewer?.readyState === 1) {
+          sendJson(oldSession.viewer, { type: 'peer_disconnected' });
+          oldSession.viewer.close(1000, 'host_replaced');
+        }
+        cleanupSession(hostId);
+      }
 
-      sessions.set(id, {
+      // Registruj zariadenie do persistent registry
+      const device = registerDevice(hostId, ip);
+
+      // Pouzij existujuce heslo alebo vygeneruj nove (perzistentne)
+      const password = getOrCreatePassword(hostId);
+
+      sessions.set(hostId, {
         host: ws,
         viewer: null,
         password,
@@ -163,11 +240,11 @@ wss.on('connection', (ws, req) => {
       });
 
       role = 'host';
-      sessionId = id;
+      sessionId = hostId;
 
-      resetSessionTimeout(id);
-      sendJson(ws, { type: 'session_created', session_id: id, password });
-      log(`Host registered: session ${id}`);
+      resetSessionTimeout(hostId);
+      sendJson(ws, { type: 'session_created', session_id: hostId, password });
+      log(`Host registered: ${hostId} (device: ${device.name || 'unnamed'}, IP: ${ip})`);
       return;
     }
 
