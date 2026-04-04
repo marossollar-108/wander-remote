@@ -6,8 +6,9 @@ from enum import Enum
 
 class MessageType(Enum):
     # Registracia
-    HOST_REGISTER = "host_register"
-    SESSION_CREATED = "session_created"
+    HOST_REGISTER = "host_register"       # host_id field required
+    SESSION_CREATED = "session_created"   # session_id = host_id, password
+    DEVICE_REGISTERED = "device_registered"  # server potvrdzuje registraciu zariadenia
     VIEWER_CONNECT = "viewer_connect"
     CONNECT_SUCCESS = "connect_success"
     VIEWER_JOINED = "viewer_joined"

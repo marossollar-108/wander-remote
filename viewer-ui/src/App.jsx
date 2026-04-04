@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useWebSocket } from './hooks/useWebSocket';
 import ConnectScreen from './components/ConnectScreen';
 import RemoteDesktop from './components/RemoteDesktop';
@@ -25,6 +25,17 @@ export default function App() {
     },
     [connect]
   );
+
+  // Auto-connect from URL params (?session=XXXXXX&password=XXXXXX)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const session = params.get('session');
+    const pass = params.get('password');
+    if (session && pass) {
+      window.history.replaceState({}, '', window.location.pathname);
+      handleConnect(session, pass);
+    }
+  }, [handleConnect]);
 
   const handleDisconnect = useCallback(() => {
     disconnect();

@@ -23,6 +23,7 @@ from config import (
     KEYFRAME_INTERVAL,
     BLOCKED_COMBOS,
 )
+from host_id import get_or_create_host_id
 from screen_capture import ScreenCapture
 from input_handler import InputHandler
 from shared.protocol import MessageType, create_message, parse_message
@@ -40,6 +41,7 @@ class RemoteHost:
     def __init__(self, relay_url: str):
         self.relay_url = relay_url
         self.ws = None
+        self.host_id = get_or_create_host_id()
         self.session_id = None
         self.password = None
         self.viewer_connected = False
@@ -66,8 +68,11 @@ class RemoteHost:
                 self.ws = ws
                 logger.info("Connected to relay: %s", self.relay_url)
 
-                # Registruj sa
-                await ws.send(create_message(MessageType.HOST_REGISTER))
+                # Registruj sa s persistentnym host ID
+                logger.info("Host ID: %s", self.host_id)
+                await ws.send(create_message(
+                    MessageType.HOST_REGISTER, host_id=self.host_id
+                ))
 
                 # Cakaj na session_created
                 raw = await ws.recv()
@@ -80,12 +85,12 @@ class RemoteHost:
                 self.password = msg["password"]
 
                 logger.info(
-                    "Session ID: %s | Password: %s",
+                    "Host ID: %s | Password: %s",
                     self.session_id,
                     self.password,
                 )
-                print(f"\n  Session ID: {self.session_id}")
-                print(f"  Password:   {self.password}\n")
+                print(f"\n  Host ID:   {self.session_id}")
+                print(f"  Password:  {self.password}\n")
 
                 # Posli screen info
                 await ws.send(json.dumps({

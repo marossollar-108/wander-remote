@@ -131,7 +131,7 @@ class WanderRemoteGUI:
         # Session ID row
         tk.Label(
             self.info_frame,
-            text="Session ID",
+            text="Host ID",
             font=("Helvetica", 10),
             bg=WHITE,
             fg=GRAY,

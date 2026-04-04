@@ -1,11 +1,11 @@
 import { useState, useCallback } from 'react';
 
-const LOGO_URL =
-  'https://www.tulavekino.sk/wp-content/uploads/2026/02/Logo-EN-Cinema-Wandering-COLOR.svg';
+const LOGO_URL = '/logo.png';
 
 export default function ConnectScreen({ status, error, onConnect }) {
   const [sessionId, setSessionId] = useState('');
   const [password, setPassword] = useState('');
+  const [showDownloads, setShowDownloads] = useState(false);
 
   const isConnecting = status === 'connecting';
 
@@ -19,19 +19,19 @@ export default function ConnectScreen({ status, error, onConnect }) {
   );
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-surface px-4">
-      <div className="w-full max-w-md bg-white rounded-card shadow-lg p-8">
+    <div className="min-h-[100dvh] flex items-center justify-center bg-surface px-4 py-6">
+      <div className="w-full max-w-md bg-white rounded-card shadow-lg p-6 sm:p-8">
         {/* Logo */}
-        <div className="flex justify-center mb-6">
-          <img src={LOGO_URL} alt="Wandering Cinema" className="h-12" />
+        <div className="flex justify-center mb-4 sm:mb-6">
+          <img src={LOGO_URL} alt="Wander Remote" className="h-20 sm:h-36" />
         </div>
 
         {/* Title */}
-        <h1 className="text-2xl font-bold text-center text-tk-black mb-8">
+        <h1 className="text-xl sm:text-2xl font-bold text-center text-tk-black mb-6 sm:mb-8">
           Wander Remote
         </h1>
 
-        <form onSubmit={handleSubmit} className="space-y-5">
+        <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-5">
           {/* Session ID */}
           <div>
             <label
@@ -52,7 +52,8 @@ export default function ConnectScreen({ status, error, onConnect }) {
                 setSessionId(v);
               }}
               disabled={isConnecting}
-              className="w-full px-4 py-2.5 rounded-input border border-tk-border bg-white text-tk-black font-mono text-center text-lg tracking-widest placeholder:text-tk-black-40 focus:outline-none focus:ring-2 focus:ring-primary-ring focus:border-primary disabled:opacity-50"
+              autoComplete="off"
+              className="w-full px-4 py-3 rounded-input border border-tk-border bg-white text-tk-black font-mono text-center text-lg tracking-widest placeholder:text-tk-black-40 focus:outline-none focus:ring-2 focus:ring-primary-ring focus:border-primary disabled:opacity-50"
             />
           </div>
 
@@ -72,7 +73,8 @@ export default function ConnectScreen({ status, error, onConnect }) {
               value={password}
               onChange={(e) => setPassword(e.target.value.slice(0, 6))}
               disabled={isConnecting}
-              className="w-full px-4 py-2.5 rounded-input border border-tk-border bg-white text-tk-black font-mono text-center text-lg tracking-widest placeholder:text-tk-black-40 focus:outline-none focus:ring-2 focus:ring-primary-ring focus:border-primary disabled:opacity-50"
+              autoComplete="off"
+              className="w-full px-4 py-3 rounded-input border border-tk-border bg-white text-tk-black font-mono text-center text-lg tracking-widest placeholder:text-tk-black-40 focus:outline-none focus:ring-2 focus:ring-primary-ring focus:border-primary disabled:opacity-50"
             />
           </div>
 
@@ -95,7 +97,7 @@ export default function ConnectScreen({ status, error, onConnect }) {
             disabled={
               isConnecting || sessionId.length < 6 || password.length < 1
             }
-            className="w-full py-3 rounded-btn bg-primary text-white font-semibold text-base hover:bg-primary-hover transition-colors focus:outline-none focus:ring-2 focus:ring-primary-ring focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full py-3.5 rounded-btn bg-primary text-white font-semibold text-base hover:bg-primary-hover active:scale-[0.98] transition-all focus:outline-none focus:ring-2 focus:ring-primary-ring focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isConnecting ? (
               <span className="flex items-center justify-center gap-2">
@@ -126,29 +128,46 @@ export default function ConnectScreen({ status, error, onConnect }) {
           </button>
         </form>
 
-        {/* Download section */}
-        <div className="mt-8 pt-6 border-t border-tk-border">
-          <p className="text-sm font-medium text-tk-black-80 text-center mb-3">
+        {/* Download section — collapsible on mobile */}
+        <div className="mt-6 sm:mt-8 pt-5 sm:pt-6 border-t border-tk-border">
+          <button
+            type="button"
+            onClick={() => setShowDownloads(!showDownloads)}
+            className="sm:hidden w-full flex items-center justify-between text-sm font-medium text-tk-black-80 mb-3"
+          >
+            <span>Stiahnite si Host aplikaciu</span>
+            <svg
+              className={`w-4 h-4 text-tk-black-40 transition-transform ${showDownloads ? 'rotate-180' : ''}`}
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2}
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+          <p className="hidden sm:block text-sm font-medium text-tk-black-80 text-center mb-3">
             Stiahnite si Host aplikaciu
           </p>
-          <div className="space-y-2">
+
+          <div className={`space-y-2 ${showDownloads ? 'block' : 'hidden'} sm:block`}>
             <a
               href="https://github.com/marossollar-108/wander-remote/releases/latest/download/Wander.Remote.Host-1.0.0-arm64.dmg"
-              className="flex items-center justify-between w-full px-4 py-2.5 rounded-input border border-tk-border hover:bg-surface transition-colors text-sm"
+              className="flex items-center justify-between w-full px-4 py-3 sm:py-2.5 rounded-input border border-tk-border hover:bg-surface active:bg-tk-black-20 transition-colors text-sm"
             >
               <span className="text-tk-black">macOS (Apple Silicon)</span>
               <span className="text-tk-black-40 text-xs">.dmg — M1/M2/M3/M4</span>
             </a>
             <a
               href="https://github.com/marossollar-108/wander-remote/releases/latest/download/Wander.Remote.Host-1.0.0.dmg"
-              className="flex items-center justify-between w-full px-4 py-2.5 rounded-input border border-tk-border hover:bg-surface transition-colors text-sm"
+              className="flex items-center justify-between w-full px-4 py-3 sm:py-2.5 rounded-input border border-tk-border hover:bg-surface active:bg-tk-black-20 transition-colors text-sm"
             >
               <span className="text-tk-black">macOS (Intel)</span>
               <span className="text-tk-black-40 text-xs">.dmg — Intel Mac</span>
             </a>
             <a
               href="https://github.com/marossollar-108/wander-remote/releases/latest/download/Wander.Remote.Host.Setup.1.0.0.exe"
-              className="flex items-center justify-between w-full px-4 py-2.5 rounded-input border border-tk-border hover:bg-surface transition-colors text-sm"
+              className="flex items-center justify-between w-full px-4 py-3 sm:py-2.5 rounded-input border border-tk-border hover:bg-surface active:bg-tk-black-20 transition-colors text-sm"
             >
               <span className="text-tk-black">Windows</span>
               <span className="text-tk-black-40 text-xs">.exe — Windows 10+</span>
@@ -157,7 +176,7 @@ export default function ConnectScreen({ status, error, onConnect }) {
         </div>
 
         {/* Footer */}
-        <p className="mt-6 text-center text-xs text-tk-black-40">
+        <p className="mt-5 sm:mt-6 text-center text-xs text-tk-black-40">
           Powered by Tulave kino
         </p>
       </div>
